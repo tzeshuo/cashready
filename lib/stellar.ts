@@ -132,7 +132,7 @@ export async function verifyTransactionStatus(txHash: string): Promise<{
   error?: string;
 }> {
   try {
-    const tx = await horizonServer.getTransaction(txHash);
+    const tx = await horizonServer.transactions().transaction(txHash).call();
     return { confirmed: tx.successful, ledger: tx.ledger_attr };
   } catch (error: any) {
     return { confirmed: false, error: error.message || 'Transaction not found or pending' };
