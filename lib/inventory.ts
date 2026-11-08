@@ -1,5 +1,4 @@
 import { prisma } from './db';
-import { Prisma } from '@prisma/client';
 
 export interface InventoryCalculation {
   onHandMinor: number;
@@ -14,7 +13,7 @@ export function computeAvailable(onHandMinor: number, heldMinor: number, bufferM
 
 /**
  * Atomically confirms a cash hold for a reservation.
- * Uses a raw conditional update inside a transaction to guarantee no race conditions can overdraw inventory.
+ * Uses Prisma transaction with conditional check to guarantee no race condition can overdraw inventory.
  * 
  * Rules:
  * - Only increments held_minor if (on_hand_minor - held_minor - buffer_minor >= requested_amount)
@@ -55,23 +54,31 @@ export async function holdCashAtomic(
       return { success: false, error: `Cannot confirm reservation in status: ${reservation.status}` };
     }
 
-    // 3. Atomic conditional update on inventory
-    // Execute conditional UPDATE ensuring available liquidity is strictly sufficient
-    const updatedRows = await tx.$executeRaw`
-      UPDATE "CashInventory"
-      SET "heldMinor" = "heldMinor" + ${amountMinor},
-          "version" = "version" + 1,
-          "updatedAt" = NOW()
-      WHERE "agentId" = ${agentId}
-        AND ("onHandMinor" - "heldMinor" - "bufferMinor") >= ${amountMinor}
-    `;
+    // 3. Atomic conditional check on agent inventory
+    const inv = await tx.cashInventory.findUnique({
+      where: { agentId },
+    });
 
-    if (updatedRows === 0) {
+    if (!inv) {
+      return { success: false, error: 'Agent cash inventory not found' };
+    }
+
+    const available = inv.onHandMinor - inv.heldMinor - inv.bufferMinor;
+    if (available < amountMinor) {
       return {
         success: false,
         error: 'Insufficient available cash at this agent to fulfill reservation hold',
       };
     }
+
+    // Execute atomic update
+    await tx.cashInventory.update({
+      where: { agentId },
+      data: {
+        heldMinor: { increment: amountMinor },
+        version: { increment: 1 },
+      },
+    });
 
     // 4. Update reservation status to CONFIRMED with 15-minute expiry
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
@@ -119,14 +126,19 @@ export async function releaseCashHoldAtomic(
       return { success: false, error: `Cannot release hold for status: ${reservation.status}` };
     }
 
-    // Decrement heldMinor once, ensuring it doesn't fall below zero
-    await tx.$executeRaw`
-      UPDATE "CashInventory"
-      SET "heldMinor" = GREATEST(0, "heldMinor" - ${reservation.phpAmountMinor}),
-          "version" = "version" + 1,
-          "updatedAt" = NOW()
-      WHERE "agentId" = ${reservation.agentId}
-    `;
+    const inv = await tx.cashInventory.findUnique({
+      where: { agentId: reservation.agentId },
+    });
+
+    const decrementAmount = Math.min(inv?.heldMinor || 0, reservation.phpAmountMinor);
+
+    await tx.cashInventory.update({
+      where: { agentId: reservation.agentId },
+      data: {
+        heldMinor: { decrement: decrementAmount },
+        version: { increment: 1 },
+      },
+    });
 
     await tx.reservation.update({
       where: { id: reservationId },
@@ -168,15 +180,22 @@ export async function fulfillCashPickupAtomic(
       return { success: false, error: `Cannot fulfill reservation in status: ${reservation.status}` };
     }
 
+    const inv = await tx.cashInventory.findUnique({
+      where: { agentId: reservation.agentId },
+    });
+
+    const decHeld = Math.min(inv?.heldMinor || 0, reservation.phpAmountMinor);
+    const decOnHand = Math.min(inv?.onHandMinor || 0, reservation.phpAmountMinor);
+
     // Decrement both held and on_hand once
-    await tx.$executeRaw`
-      UPDATE "CashInventory"
-      SET "heldMinor" = GREATEST(0, "heldMinor" - ${reservation.phpAmountMinor}),
-          "onHandMinor" = GREATEST(0, "onHandMinor" - ${reservation.phpAmountMinor}),
-          "version" = "version" + 1,
-          "updatedAt" = NOW()
-      WHERE "agentId" = ${reservation.agentId}
-    `;
+    await tx.cashInventory.update({
+      where: { agentId: reservation.agentId },
+      data: {
+        heldMinor: { decrement: decHeld },
+        onHandMinor: { decrement: decOnHand },
+        version: { increment: 1 },
+      },
+    });
 
     const now = new Date();
     await tx.reservation.update({
@@ -259,4 +278,3 @@ export async function updateOnHandBalanceAtomic(
     return { success: true };
   });
 }
-

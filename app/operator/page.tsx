@@ -181,7 +181,7 @@ export default function OperatorPage() {
                         <button
                           onClick={() => {
                             setSelectedPayoutId(p.id);
-                            setAgentWallet(p.selectedAgentAddress || 'GBAGENTCEBU00000000000000000000000000000000000000000000');
+                            setAgentWallet(p.selectedAgentAddress || 'GBD5EKQLZYO3FFW4OVXTZ5MNEUGDGAZF3SBHD36AHFUAEPQ33TLCGBRK');
                           }}
                           className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium py-1 px-2.5 rounded border border-indigo-200 transition"
                         >

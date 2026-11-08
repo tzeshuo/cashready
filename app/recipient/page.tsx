@@ -64,7 +64,7 @@ export default function RecipientPage() {
           'x-demo-role': 'funder',
         },
         body: JSON.stringify({
-          funderAddress: 'GBDEMOFUNDERTESTNETKEY00000000000000000000000000000000000',
+          funderAddress: 'GACR4M343MW6OV6Z4T6FHPK47MFJZNUU6Z3ENNICPF3L665VHZ2VIOZN',
           asset,
           tokenAmountBaseUnits: asset === 'XLM' ? '100000000' : '20000000', // 10 XLM or 2 USDC
         }),

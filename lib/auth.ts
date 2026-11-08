@@ -10,13 +10,13 @@ export interface DemoSession {
   stellarAddress?: string;
 }
 
-// Deterministic mock sessions for the demo showcase
+// Deterministic mock sessions with valid 56-char Stellar Testnet addresses
 export const DEMO_SESSIONS: Record<string, DemoSession> = {
   funder: {
     userId: 'usr_funder_demo',
     role: 'funder',
     name: 'Maria (Demo Funder)',
-    stellarAddress: process.env.DEMO_FUNDER_PUBLIC_KEY || 'GBDEMOFUNDERTESTNETKEY00000000000000000000000000000000000',
+    stellarAddress: process.env.DEMO_FUNDER_PUBLIC_KEY || 'GACR4M343MW6OV6Z4T6FHPK47MFJZNUU6Z3ENNICPF3L665VHZ2VIOZN',
   },
   recipient: {
     userId: 'usr_recipient_demo',
@@ -28,35 +28,30 @@ export const DEMO_SESSIONS: Record<string, DemoSession> = {
     role: 'agent',
     name: 'Cebu Central Express (Agent B)',
     agentId: 'agt_cebu_central_002',
-    stellarAddress: 'GBAGENTCEBU00000000000000000000000000000000000000000000',
+    stellarAddress: 'GBD5EKQLZYO3FFW4OVXTZ5MNEUGDGAZF3SBHD36AHFUAEPQ33TLCGBRK',
   },
   'agent-manila': {
     userId: 'usr_agent_manila',
     role: 'agent',
     name: 'Manila QuickCash (Agent A - Low Cash)',
     agentId: 'agt_manila_quick_001',
-    stellarAddress: 'GBAGENTMANILA000000000000000000000000000000000000000000',
+    stellarAddress: 'GDYK2HHHTYIVZP3NF3EJ2PZJFIMFMA7E7TKMDDUFKWLI6ETD3375LQPW',
   },
   'agent-davao': {
     userId: 'usr_agent_davao',
     role: 'agent',
     name: 'Davao Bay Remit (Agent C - Offline)',
     agentId: 'agt_davao_bay_003',
-    stellarAddress: 'GBAGENTDAVAO0000000000000000000000000000000000000000000',
+    stellarAddress: 'GAVKGUTZESFZ343XUIVGJFA435P6O3HGAGOIRO6HLWR6RGRIJM54YGED',
   },
   operator: {
     userId: 'usr_operator_demo',
     role: 'operator',
     name: 'CashReady Settlement Operator',
-    stellarAddress: process.env.OPERATOR_PUBLIC_KEY || 'GBDEMOOPERATORTESTNETKEY0000000000000000000000000000000000',
+    stellarAddress: process.env.OPERATOR_PUBLIC_KEY || 'GAMO4WVADWGDUIJZXWUFCQWENBVO5MZXESTSOGPQNFX7GPK4SASKLOHE',
   },
 };
 
-/**
- * Server-side RBAC session resolver.
- * Reads 'x-demo-role' or 'Authorization' header to determine authenticated identity.
- * In a production setting, this inspects a cryptographically signed JWT or secure session cookie.
- */
 export function getSession(request: NextRequest): DemoSession | null {
   const roleHeader = request.headers.get('x-demo-role');
   if (roleHeader && DEMO_SESSIONS[roleHeader]) {
@@ -71,7 +66,6 @@ export function getSession(request: NextRequest): DemoSession | null {
     }
   }
 
-  // Fallback to cookie if present
   const roleCookie = request.cookies.get('cashready_role')?.value;
   if (roleCookie && DEMO_SESSIONS[roleCookie]) {
     return DEMO_SESSIONS[roleCookie];
@@ -80,10 +74,10 @@ export function getSession(request: NextRequest): DemoSession | null {
   return null;
 }
 
-/**
- * Guard utility for Route Handlers to enforce required roles.
- */
-export function requireRole(request: NextRequest, allowedRoles: UserRole[]): { session: DemoSession } | { errorResponse: Response } {
+export function requireRole(
+  request: NextRequest,
+  allowedRoles: UserRole[]
+): { session: DemoSession } | { errorResponse: Response } {
   const session = getSession(request);
 
   if (!session) {

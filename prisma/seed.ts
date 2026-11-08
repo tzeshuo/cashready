@@ -20,7 +20,7 @@ async function main() {
       name: 'Manila QuickCash (Agent A - Low Cash)',
       town: 'Manila',
       active: true,
-      receivingAddress: 'GBAGENTMANILA000000000000000000000000000000000000000000',
+      receivingAddress: 'GDYK2HHHTYIVZP3NF3EJ2PZJFIMFMA7E7TKMDDUFKWLI6ETD3375LQPW',
       operatingHours: '08:00 - 17:00 PHT',
       inventory: {
         create: {
@@ -39,7 +39,7 @@ async function main() {
       name: 'Cebu Central Express (Agent B - Happy Path)',
       town: 'Cebu',
       active: true,
-      receivingAddress: 'GBAGENTCEBU00000000000000000000000000000000000000000000',
+      receivingAddress: 'GBD5EKQLZYO3FFW4OVXTZ5MNEUGDGAZF3SBHD36AHFUAEPQ33TLCGBRK',
       operatingHours: '09:00 - 19:00 PHT',
       inventory: {
         create: {
@@ -58,7 +58,7 @@ async function main() {
       name: 'Davao Bay Remit (Agent C - Offline)',
       town: 'Davao',
       active: false,
-      receivingAddress: 'GBAGENTDAVAO0000000000000000000000000000000000000000000',
+      receivingAddress: 'GAVKGUTZESFZ343XUIVGJFA435P6O3HGAGOIRO6HLWR6RGRIJM54YGED',
       operatingHours: 'Closed Today',
       inventory: {
         create: {

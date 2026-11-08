@@ -1,39 +1,12 @@
-// Prisma schema for CashReady prototype (PostgreSQL)
+// Prisma schema for CashReady prototype (SQLite for local zero-config, PostgreSQL for production)
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
-}
-
-enum PayoutStatus {
-  CREATED
-  FUNDED
-  RELEASED
-  REFUNDED
-}
-
-enum ReservationStatus {
-  REQUESTED
-  CONFIRMED
-  REJECTED
-  EXPIRED
-  CANCELLED
-  FULFILLED
-}
-
-enum SettlementStatus {
-  PENDING
-  CONFIRMED
-  FAILED_RETRYABLE
-}
-
-enum SupportedAsset {
-  XLM
-  USDC
 }
 
 model Agent {
@@ -56,7 +29,7 @@ model CashInventory {
   onHandMinor  Int      @default(0) // Integer PHP centavos (e.g., 1,500,000 = ₱15,000.00)
   heldMinor    Int      @default(0) // Locked in active CONFIRMED reservations
   bufferMinor  Int      @default(0) // Minimum liquidity reserve
-  version      Int      @default(1) // Optimistic locking counter
+  version      Int      @default(1) // Optimistic concurrency locking counter
   updatedAt    DateTime @updatedAt
 }
 
@@ -64,12 +37,12 @@ model Payout {
   id                   String            @id @default(uuid())
   funderAddress        String            // Stellar G... address of sender
   selectedAgentAddress String?           // Stellar G... address of chosen agent (set at fulfillment/release)
-  asset                SupportedAsset    @default(XLM)
+  asset                String            @default("XLM") // XLM or USDC
   assetIssuer          String?           // Circle Testnet USDC issuer G...
   assetSacId           String            // Stellar Asset Contract address C...
   tokenAmountBaseUnits String            // 7-decimal integer base units serialized as string
   onchainPayoutId      String?           // Contract payout identifier
-  payoutStatus         PayoutStatus      @default(CREATED)
+  payoutStatus         String            @default("CREATED") // CREATED, FUNDED, RELEASED, REFUNDED
   fundingTxHash        String?           // Stellar Testnet transaction hash
   reservations         Reservation[]
   settlementIntent     SettlementIntent?
@@ -84,10 +57,10 @@ model Reservation {
   agentId         String
   agent           Agent             @relation(fields: [agentId], references: [id])
   phpAmountMinor  Int               // Requested cash in centavos
-  status          ReservationStatus @default(REQUESTED)
+  status          String            @default("REQUESTED") // REQUESTED, CONFIRMED, REJECTED, EXPIRED, CANCELLED, FULFILLED
   expiresAt       DateTime          // 15-minute expiration window
   pickupPinHmac   String?           // HMAC-SHA256(secret, reservationId + ':' + pin)
-  sealedPin       String?           // AES-256-GCM sealed token (unsealed only by recipient upon CONFIRMED status)
+  sealedPin       String?           // AES-256-GCM sealed token
   pinAttempts     Int               @default(0)
   pickupAt        DateTime?         // Timestamp of agent handover verification
   acknowledgedAt  DateTime?         // Timestamp of recipient simulated acknowledgement
@@ -99,15 +72,15 @@ model Reservation {
 }
 
 model SettlementIntent {
-  id            String           @id @default(uuid())
-  payoutId      String           @unique
-  payout        Payout           @relation(fields: [payoutId], references: [id], onDelete: Cascade)
-  approvalActor String           // Operator identifier
-  status        SettlementStatus @default(PENDING)
-  txHash        String?          // Stellar release transaction hash
-  error         String?          // Last RPC failure error if retrying
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id            String   @id @default(uuid())
+  payoutId      String   @unique
+  payout        Payout   @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  approvalActor String   // Operator identifier
+  status        String   @default("PENDING") // PENDING, CONFIRMED, FAILED_RETRYABLE
+  txHash        String?  // Stellar release transaction hash
+  error         String?  // Last RPC failure error if retrying
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model AuditEvent {
