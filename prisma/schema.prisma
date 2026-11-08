@@ -1,0 +1,119 @@
+// Prisma schema for CashReady prototype (PostgreSQL)
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum PayoutStatus {
+  CREATED
+  FUNDED
+  RELEASED
+  REFUNDED
+}
+
+enum ReservationStatus {
+  REQUESTED
+  CONFIRMED
+  REJECTED
+  EXPIRED
+  CANCELLED
+  FULFILLED
+}
+
+enum SettlementStatus {
+  PENDING
+  CONFIRMED
+  FAILED_RETRYABLE
+}
+
+enum SupportedAsset {
+  XLM
+  USDC
+}
+
+model Agent {
+  id               String         @id @default(cuid())
+  name             String
+  town             String
+  active           Boolean        @default(true)
+  receivingAddress String         // Stellar G... public key on Testnet
+  operatingHours   String         @default("08:00 - 18:00 PHT")
+  inventory        CashInventory?
+  reservations     Reservation[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model CashInventory {
+  id           String   @id @default(cuid())
+  agentId      String   @unique
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  onHandMinor  Int      @default(0) // Integer PHP centavos (e.g., 1,500,000 = ₱15,000.00)
+  heldMinor    Int      @default(0) // Locked in active CONFIRMED reservations
+  bufferMinor  Int      @default(0) // Minimum liquidity reserve
+  version      Int      @default(1) // Optimistic locking counter
+  updatedAt    DateTime @updatedAt
+}
+
+model Payout {
+  id                   String            @id @default(uuid())
+  funderAddress        String            // Stellar G... address of sender
+  selectedAgentAddress String?           // Stellar G... address of chosen agent (set at fulfillment/release)
+  asset                SupportedAsset    @default(XLM)
+  assetIssuer          String?           // Circle Testnet USDC issuer G...
+  assetSacId           String            // Stellar Asset Contract address C...
+  tokenAmountBaseUnits String            // 7-decimal integer base units serialized as string
+  onchainPayoutId      String?           // Contract payout identifier
+  payoutStatus         PayoutStatus      @default(CREATED)
+  fundingTxHash        String?           // Stellar Testnet transaction hash
+  reservations         Reservation[]
+  settlementIntent     SettlementIntent?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+}
+
+model Reservation {
+  id              String            @id @default(uuid())
+  payoutId        String
+  payout          Payout            @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  agentId         String
+  agent           Agent             @relation(fields: [agentId], references: [id])
+  phpAmountMinor  Int               // Requested cash in centavos
+  status          ReservationStatus @default(REQUESTED)
+  expiresAt       DateTime          // 15-minute expiration window
+  pickupPinHmac   String?           // HMAC-SHA256(secret, reservationId + ':' + pin)
+  pinAttempts     Int               @default(0)
+  pickupAt        DateTime?         // Timestamp of agent handover verification
+  acknowledgedAt  DateTime?         // Timestamp of recipient simulated acknowledgement
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([payoutId])
+  @@index([agentId])
+}
+
+model SettlementIntent {
+  id            String           @id @default(uuid())
+  payoutId      String           @unique
+  payout        Payout           @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  approvalActor String           // Operator identifier
+  status        SettlementStatus @default(PENDING)
+  txHash        String?          // Stellar release transaction hash
+  error         String?          // Last RPC failure error if retrying
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid())
+  actor      String
+  action     String
+  entityRef  String   // e.g. "payout:uuid" or "reservation:uuid"
+  metadata   String?  // Sanitized JSON string (no keys or PII)
+  timestamp  DateTime @default(now())
+}
