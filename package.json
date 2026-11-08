@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "demo:reset": "tsx scripts/reset-demo.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",

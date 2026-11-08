@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Link from 'next/link';
+import ResetDemoButton from '@/components/ResetDemoButton';
 
 export const metadata: Metadata = {
   title: 'CashReady — Stellar Testnet Cash-Out Reservation',
@@ -45,6 +46,7 @@ export default function RootLayout({
               >
                 Operator Admin
               </Link>
+              <ResetDemoButton />
             </nav>
           </div>
         </header>

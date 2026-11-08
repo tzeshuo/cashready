@@ -129,3 +129,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error while creating reservation' }, { status: 500 });
   }
 }
+
+export async function GET(request: NextRequest) {
+  const auth = requireRole(request, ['recipient', 'agent', 'operator']);
+  if ('errorResponse' in auth) {
+    return auth.errorResponse;
+  }
+
+  const { searchParams } = new URL(request.url);
+  const agentId = searchParams.get('agentId');
+  const payoutId = searchParams.get('payoutId');
+
+  try {
+    const where: any = {};
+    if (agentId) where.agentId = agentId;
+    if (payoutId) where.payoutId = payoutId;
+
+    const reservations = await prisma.reservation.findMany({
+      where,
+      include: {
+        agent: true,
+        payout: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    return NextResponse.json({ reservations });
+  } catch (error) {
+    console.error('Failed to list reservations:', error);
+    return NextResponse.json({ error: 'Internal server error while fetching reservations' }, { status: 500 });
+  }
+}

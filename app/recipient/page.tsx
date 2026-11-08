@@ -34,6 +34,16 @@ export default function RecipientPage() {
     fetchAgents();
   }, [town]);
 
+  // Live auto-poll payout and reservation status every 3s
+  useEffect(() => {
+    if (!payoutId) return;
+    refreshPayoutStatus(payoutId);
+    const interval = setInterval(() => {
+      refreshPayoutStatus(payoutId);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [payoutId]);
+
   async function fetchAgents() {
     setLoadingAgents(true);
     try {
@@ -157,7 +167,14 @@ export default function RecipientPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Reservation request failed');
 
-      setStatusMessage('Reservation request created! Please have the agent confirm cash hold.');
+      setStatusMessage(`Reservation created! ID: ${data.reservationId}. Go to Agent Desk to confirm hold.`);
+      setReservation({
+        id: data.reservationId,
+        status: data.status,
+        agentId: data.agentId,
+        phpAmountMinor: data.phpAmountMinor,
+        expiresAt: data.expiresAt,
+      });
       await refreshPayoutStatus(payoutId);
     } catch (err: any) {
       setErrorMessage(err.message);
@@ -342,10 +359,28 @@ export default function RecipientPage() {
 
           {reservation ? (
             <div className="space-y-4">
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                <div className="text-xs text-slate-500">Reservation Status:</div>
-                <div className="text-lg font-bold text-slate-900 uppercase tracking-wide">
-                  {reservation.status}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase">Reservation ID (for Agent Desk)</div>
+                  <div className="mt-1 font-mono text-xs bg-white p-2 rounded-lg border border-slate-200 select-all font-semibold flex items-center justify-between">
+                    <span className="truncate mr-2">{reservation.id}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(reservation.id);
+                        alert('Copied Reservation ID to clipboard!');
+                      }}
+                      className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-sans font-medium hover:bg-blue-100 transition shrink-0"
+                    >
+                      Copy ID
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                  <span className="text-xs text-slate-500 font-medium">Reservation Status:</span>
+                  <span className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                    {reservation.status}
+                  </span>
                 </div>
 
                 {reservation.status === 'CONFIRMED' && (

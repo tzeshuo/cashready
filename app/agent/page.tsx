@@ -38,8 +38,9 @@ export default function AgentPage() {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  // Agent inventory stats
+  // Agent inventory stats & reservations queue
   const [inventory, setInventory] = useState<any>(null);
+  const [agentReservations, setAgentReservations] = useState<any[]>([]);
 
   useEffect(() => {
     fetchAgentDetails();
@@ -47,6 +48,7 @@ export default function AgentPage() {
 
   async function fetchAgentDetails() {
     try {
+      // 1. Fetch agent inventory
       const res = await fetch(`/api/agents?town=${selectedAgent.town}`, {
         headers: { 'x-demo-role': selectedAgent.roleKey },
       });
@@ -55,14 +57,24 @@ export default function AgentPage() {
         const found = data.agents.find((a: any) => a.id === selectedAgent.id);
         if (found) setInventory(found);
       }
+
+      // 2. Fetch reservations queue for this agent
+      const resvRes = await fetch(`/api/reservations?agentId=${selectedAgent.id}`, {
+        headers: { 'x-demo-role': selectedAgent.roleKey },
+      });
+      const resvData = await resvRes.json();
+      if (resvRes.ok) {
+        setAgentReservations(resvData.reservations || []);
+      }
     } catch (err) {
       console.error(err);
     }
   }
 
-  async function handleConfirmHold() {
-    if (!reservationId) {
-      setErrorMessage('Please enter the Reservation UUID to confirm.');
+  async function handleConfirmHold(idToConfirm?: string) {
+    const targetId = idToConfirm || reservationId;
+    if (!targetId) {
+      setErrorMessage('Please enter or select a Reservation UUID to confirm.');
       return;
     }
 
@@ -71,7 +83,7 @@ export default function AgentPage() {
     setStatusMessage('Executing atomic inventory conditional update...');
 
     try {
-      const res = await fetch(`/api/reservations/${reservationId}/confirm`, {
+      const res = await fetch(`/api/reservations/${targetId}/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,6 +98,7 @@ export default function AgentPage() {
       }
 
       setStatusMessage(`✓ Hold Confirmed! ${data.message}`);
+      setReservationId(targetId);
       await fetchAgentDetails();
     } catch (err: any) {
       setErrorMessage(err.message);
@@ -133,11 +146,19 @@ export default function AgentPage() {
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-slate-200 pb-4">
-        <h1 className="text-2xl font-bold text-slate-900">Agent Desk</h1>
-        <p className="text-sm text-slate-600">
-          Agent point-of-presence terminal. Confirm time-limited cash holds and attest physical cash handover with 6-digit OTP verification.
-        </p>
+      <div className="border-b border-slate-200 pb-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Agent Desk</h1>
+          <p className="text-sm text-slate-600">
+            Agent point-of-presence terminal. Confirm time-limited cash holds and attest physical cash handover with 6-digit OTP verification.
+          </p>
+        </div>
+        <button
+          onClick={fetchAgentDetails}
+          className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300 font-medium transition"
+        >
+          ↻ Refresh Desk
+        </button>
       </div>
 
       {statusMessage && (
@@ -207,27 +228,85 @@ export default function AgentPage() {
           </h2>
 
           <p className="text-xs text-slate-600">
-            Accept a pending reservation. Executes an atomic conditional database update ensuring on-hand minus held minus buffer exceeds requested cash.
+            Accept a pending reservation. Executes an atomic conditional database update ensuring available cash exceeds requested cash.
           </p>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-600">Reservation UUID</label>
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-semibold text-slate-600">Reservation UUID</label>
+              <span className="text-[10px] text-slate-400 font-mono">(Must be Reservation ID, not Payout ID)</span>
+            </div>
             <input
               type="text"
               value={reservationId}
               onChange={(e) => setReservationId(e.target.value)}
               placeholder="Paste Reservation UUID..."
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
             />
           </div>
 
           <button
-            onClick={handleConfirmHold}
+            onClick={() => handleConfirmHold()}
             disabled={loading}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition disabled:opacity-50"
           >
             Confirm & Lock Cash Hold
           </button>
+
+          {/* Incoming Queue for this agent */}
+          <div className="pt-3 border-t border-slate-200 space-y-2">
+            <div className="text-xs font-bold text-slate-700 flex justify-between items-center">
+              <span>Incoming Queue ({selectedAgent.town})</span>
+              <span className="text-[11px] text-slate-500 font-normal">{agentReservations.length} total</span>
+            </div>
+
+            {agentReservations.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No incoming requests for this agent yet.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {agentReservations.map((resv) => (
+                  <div
+                    key={resv.id}
+                    className={`p-2 rounded-lg border text-xs flex justify-between items-center ${
+                      reservationId === resv.id ? 'border-emerald-500 bg-emerald-50/40' : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-mono text-[11px] font-bold text-slate-800">{resv.id.slice(0, 8)}...</div>
+                      <div className="text-[10px] text-slate-500">
+                        ₱{(resv.phpAmountMinor / 100).toLocaleString()} •{' '}
+                        <span className={`font-semibold ${
+                          resv.status === 'CONFIRMED' ? 'text-emerald-600' :
+                          resv.status === 'REQUESTED' ? 'text-amber-600' : 'text-slate-600'
+                        }`}>
+                          {resv.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => {
+                          setReservationId(resv.id);
+                        }}
+                        className="text-[11px] bg-white border border-slate-300 text-slate-700 px-2 py-1 rounded hover:bg-slate-100"
+                      >
+                        Select
+                      </button>
+                      {resv.status === 'REQUESTED' && (
+                        <button
+                          onClick={() => handleConfirmHold(resv.id)}
+                          className="text-[11px] bg-emerald-600 text-white px-2 py-1 rounded hover:bg-emerald-700 font-medium"
+                        >
+                          Confirm
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Action 2: PIN Verification & Handover Attestation */}
