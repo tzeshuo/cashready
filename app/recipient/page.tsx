@@ -53,7 +53,11 @@ export default function RecipientPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setAgents(data.agents || []);
+        const loaded = data.agents || [];
+        setAgents(loaded);
+        if (loaded.length > 0 && (!selectedAgentId || !loaded.some((a: any) => a.id === selectedAgentId))) {
+          setSelectedAgentId(loaded[0].id);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -326,11 +330,18 @@ export default function RecipientPage() {
                   onClick={() => setSelectedAgentId(ag.id)}
                   className={`p-3 rounded-lg border text-xs cursor-pointer transition ${
                     selectedAgentId === ag.id
-                      ? 'border-blue-500 bg-blue-50/50'
+                      ? 'border-blue-500 bg-blue-50/70 shadow-sm ring-1 ring-blue-500'
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <div className="font-bold text-slate-800">{ag.name}</div>
+                  <div className="flex justify-between items-center font-bold text-slate-800">
+                    <span>{ag.name}</span>
+                    {selectedAgentId === ag.id && (
+                      <span className="text-[10px] bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">
+                        ✓ SELECTED
+                      </span>
+                    )}
+                  </div>
                   <div className="text-slate-500 flex justify-between mt-1">
                     <span>Town: {ag.town}</span>
                     <span className="font-mono text-emerald-600 font-semibold">
@@ -341,6 +352,12 @@ export default function RecipientPage() {
               ))
             )}
           </div>
+
+          {selectedAgentId && (
+            <div className="text-xs p-2 bg-slate-50 rounded border border-slate-200 text-slate-600">
+              Selected: <strong className="text-slate-800">{agents.find(a => a.id === selectedAgentId)?.name}</strong>
+            </div>
+          )}
 
           <button
             onClick={handleRequestReservation}
@@ -398,8 +415,18 @@ export default function RecipientPage() {
                 )}
 
                 {reservation.status === 'REQUESTED' && (
-                  <div className="text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
-                    Awaiting Agent to confirm inventory hold from the Agent Desk.
+                  <div className="text-xs text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200 space-y-2">
+                    <div>
+                      Awaiting <strong>{reservation.agentName || agents.find(a => a.id === reservation.agentId)?.name || 'Agent'}</strong> to confirm inventory hold from the Agent Desk.
+                    </div>
+                    <div>
+                      <a
+                        href={`/agent?agentId=${reservation.agentId}`}
+                        className="inline-flex items-center text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-3 py-1.5 rounded-md transition"
+                      >
+                        👉 Open Agent Desk as {reservation.agentName || agents.find(a => a.id === reservation.agentId)?.name || 'Agent'} →
+                      </a>
+                    </div>
                   </div>
                 )}
 
