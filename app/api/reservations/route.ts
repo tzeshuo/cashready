@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireRole } from '@/lib/auth';
 import { CreateReservationSchema } from '@/lib/validation';
-import { generatePickupPin, hashPickupPin } from '@/lib/otp';
+import { generatePickupPin, hashPickupPin, sealPinForRecipient } from '@/lib/otp';
 
 export async function POST(request: NextRequest) {
   const auth = requireRole(request, ['recipient']);
@@ -88,12 +88,16 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Compute HMAC bound to this newly created reservation ID
+      // Compute HMAC bound to this newly created reservation ID and seal PIN
       const pinHmac = hashPickupPin(res.id, generatedPin);
+      const sealedPin = sealPinForRecipient(generatedPin, res.id);
       
       const updated = await tx.reservation.update({
         where: { id: res.id },
-        data: { pickupPinHmac: pinHmac },
+        data: {
+          pickupPinHmac: pinHmac,
+          sealedPin,
+        },
       });
 
       await tx.auditEvent.create({

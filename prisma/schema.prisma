@@ -87,6 +87,7 @@ model Reservation {
   status          ReservationStatus @default(REQUESTED)
   expiresAt       DateTime          // 15-minute expiration window
   pickupPinHmac   String?           // HMAC-SHA256(secret, reservationId + ':' + pin)
+  sealedPin       String?           // AES-256-GCM sealed token (unsealed only by recipient upon CONFIRMED status)
   pinAttempts     Int               @default(0)
   pickupAt        DateTime?         // Timestamp of agent handover verification
   acknowledgedAt  DateTime?         // Timestamp of recipient simulated acknowledgement

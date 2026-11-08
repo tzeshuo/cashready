@@ -109,6 +109,17 @@ export default function RecipientPage() {
         if (data.cashReservation) {
           setReservation(data.cashReservation);
           setAcknowledged(!!data.cashReservation.acknowledgedAt);
+          // If confirmed, fetch unsealed 6-digit PIN for recipient display
+          if (data.cashReservation.status === 'CONFIRMED') {
+            fetch(`/api/reservations/${data.cashReservation.id}/pickup-code`, {
+              headers: { 'x-demo-role': 'recipient' },
+            })
+              .then((r) => r.json())
+              .then((pinData) => {
+                if (pinData.pin) setOtpCode(pinData.pin);
+              })
+              .catch(console.error);
+          }
         }
       }
     } catch (err) {
@@ -343,7 +354,7 @@ export default function RecipientPage() {
                       Show this 6-digit one-time pickup code to the agent:
                     </p>
                     <div className="font-mono text-3xl font-extrabold tracking-widest text-emerald-600 bg-white py-2 px-4 rounded-lg border border-emerald-200 shadow-inner">
-                      748291
+                      {otpCode || '......'}
                     </div>
                     <p className="text-[11px] text-slate-400">
                       Valid for 15 minutes • Single-use only

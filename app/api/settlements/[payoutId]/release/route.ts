@@ -50,11 +50,34 @@ export async function POST(
       );
     }
 
-    // 2. Invariant: physical pickup must be attested and FULFILLED
-    if (payout.reservations.length === 0) {
+    // 2. Invariant: physical pickup must be attested and FULFILLED with recipient acknowledgement
+    const fulfilledReservation = payout.reservations[0];
+    if (!fulfilledReservation) {
       return NextResponse.json(
         { error: 'Cannot release on-chain settlement: No fulfilled physical cash reservation exists for this payout.' },
         { status: 412 } // 412 Precondition Failed
+      );
+    }
+
+    if (!fulfilledReservation.acknowledgedAt) {
+      return NextResponse.json(
+        { error: 'Cannot release on-chain settlement: Recipient simulated acknowledgement is missing.' },
+        { status: 412 }
+      );
+    }
+
+    // Require audit event record before operator approval
+    const eventRecord = await prisma.auditEvent.findFirst({
+      where: {
+        entityRef: `reservation:${fulfilledReservation.id}`,
+        action: 'RESERVATION_FULFILLED',
+      },
+    });
+
+    if (!eventRecord) {
+      return NextResponse.json(
+        { error: 'Cannot release on-chain settlement: Handover attestation event record is missing.' },
+        { status: 412 }
       );
     }
 
