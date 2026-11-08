@@ -203,3 +203,60 @@ export async function fulfillCashPickupAtomic(
     return { success: true };
   });
 }
+
+/**
+ * Updates reported on-hand cash balance.
+ * Rejects inconsistent manual balance changes:
+ * Enforces that new on-hand balance is strictly >= held_minor + buffer_minor.
+ */
+export async function updateOnHandBalanceAtomic(
+  agentId: string,
+  newOnHandMinor: number,
+  actor: string
+): Promise<{ success: boolean; error?: string }> {
+  if (newOnHandMinor < 0) {
+    return { success: false, error: 'On-hand balance cannot be negative' };
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    const inv = await tx.cashInventory.findUnique({
+      where: { agentId },
+    });
+
+    if (!inv) {
+      return { success: false, error: 'Agent inventory not found' };
+    }
+
+    const minRequired = inv.heldMinor + inv.bufferMinor;
+    if (newOnHandMinor < minRequired) {
+      return {
+        success: false,
+        error: `Inconsistent balance change rejected: New on-hand balance (${newOnHandMinor}) cannot be less than active holds + buffer (${minRequired})`,
+      };
+    }
+
+    await tx.cashInventory.update({
+      where: { agentId },
+      data: {
+        onHandMinor: newOnHandMinor,
+        version: { increment: 1 },
+      },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        actor,
+        action: 'INVENTORY_ON_HAND_UPDATED',
+        entityRef: `inventory:${inv.id}`,
+        metadata: JSON.stringify({
+          agentId,
+          oldOnHandMinor: inv.onHandMinor,
+          newOnHandMinor,
+        }),
+      },
+    });
+
+    return { success: true };
+  });
+}
+
