@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generatePickupPin, hashPickupPin, verifyPickupPin } from '../lib/otp';
-import { computeAvailable, toBaseUnits, fromBaseUnits, formatPhp } from '../lib/assets';
+import { toBaseUnits, fromBaseUnits, formatPhp } from '../lib/assets';
+import { computeAvailable } from '../lib/inventory';
 
 describe('Pickup OTP Security & HMAC Invariants', () => {
   const reservationId = 'res_test_uuid_12345';

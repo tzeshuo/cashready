@@ -75,16 +75,16 @@ describe('Prompt E1 / Pickup — OTP Security, Expiry, Replay & Auth Invariants'
   // 4. Unauthorized agent tests
   describe('Agent Role & Assignment Authorization', () => {
     it('rejects verification when agent ID does not match assigned reservation agent', () => {
-      const assignedAgentId = 'agt_cebu_central_002';
-      const candidateAgentId = 'agt_manila_quick_001';
+      const assignedAgentId: string = 'agt_cebu_central_002';
+      const candidateAgentId: string = 'agt_manila_quick_001';
 
       const isAuthorized = candidateAgentId === assignedAgentId;
       expect(isAuthorized).toBe(false);
     });
 
     it('allows verification only when agent identity matches assigned agent', () => {
-      const assignedAgentId = 'agt_cebu_central_002';
-      const candidateAgentId = 'agt_cebu_central_002';
+      const assignedAgentId: string = 'agt_cebu_central_002';
+      const candidateAgentId: string = 'agt_cebu_central_002';
 
       const isAuthorized = candidateAgentId === assignedAgentId;
       expect(isAuthorized).toBe(true);
